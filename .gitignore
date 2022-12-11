@@ -1,3 +1,5 @@
 
 #ignore ALL files in directory build
 build/
+
+lib/WifiData.h
