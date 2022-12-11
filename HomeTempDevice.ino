@@ -1,7 +1,3 @@
-/*********
-  Rui Santos
-  Complete project details at https://randomnerdtutorials.com/esp8266-dht11dht22-temperature-and-humidity-web-server-with-arduino-ide/
-*********/
 
 // Import required libraries
 #include <ESP8266WiFi.h>
@@ -11,8 +7,6 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
-#include "stdlib_noniso.h"
-
 #include <DHT.h>
 #include <LiquidCrystal_I2C.h>
 
@@ -21,38 +15,35 @@
 #include "lib/html.h"
 #include "lib/button.h"
 
-#define VER   "01.00.00"
+#define VER           "01.00.00"
+#define LED_WIFISTAT  D8   //LED at GPIO4 D8
 
 /*  DISPLAY */
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-bool lightON = false;
+bool          lightON             = false;
 unsigned long previousMillisLight = 0;
-const long intervalLight = 4000;  //4 seconds
+const long    intervalLight       = 4000;  //4 seconds
 /*  DISPLAY - END */
+
+
 
 /*  TEMP */
 // current temperature & humidity, updated in loop()
-float temp = 0.0;
-float hum = 0.0;
-
-// Generally, you should use "unsigned long" for variables that hold time
-// The value will quickly become too large for an int to store
-unsigned long previousMillis      = 0;    // will store last time DHT was updated
+float         temp  = 0.0;
+float         hum   = 0.0;
+unsigned long previousMillisTemp  = 0;    // will store last time DHT was updated
 // Updates DHT readings every 10 seconds
-const long interval      = 10000;  
+const long intervalTemp           = 10000;  
 /*  TEMP - END */
-
 
 
 /* NTP */
 const long utcOffsetInSeconds = 3600;
-
 char daysOfTheWeek[7][12] = {"SUN", "MON", "TUE", "WED", "THUR", "FRI", "SAT"};
 
 // Define NTP Client to get time
-WiFiUDP ntpUDP;
+WiFiUDP   ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
-
 /* NTP - END */
 
 
@@ -72,17 +63,18 @@ String processor(const String& var){
 
 void setup(){
 
+  //LED_WIFISTAT - Switched on when ESP is not connected to the WiFi
+  pinMode(LED_WIFISTAT, OUTPUT);
+  digitalWrite(LED_WIFISTAT, HIGH);
+
   //Button
   //pinMode(buttonPin, INPUT);
-  pinMode(button1.PIN, INPUT_PULLUP);
-  attachInterrupt(button1.PIN, isr, FALLING);
-
+  pinMode(button.PIN, INPUT_PULLUP);
+  attachInterrupt(button.PIN, isr, FALLING);
 
   // Serial port for debugging purposes
-  Serial.begin(115200);
-  Serial.println("Start --> ");
-  
-  
+  Serial.begin(115200);  
+    
   // Connect to Wi-Fi
   WiFi.begin(ssid, password);
   Serial.println("Connecting to WiFi");
@@ -91,10 +83,13 @@ void setup(){
     Serial.println(".");
   }
 
+  //LED_WIFISTAT - Switched off when ESP is connected to the WiFi
+  digitalWrite(LED_WIFISTAT, LOW);
+  isConnected = true;
+
   // Print ESP8266 Local IP Address
   Serial.println(WiFi.localIP());
  
-
   // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/html", index_html, processor);
@@ -109,6 +104,7 @@ void setup(){
   // Start server
   server.begin();
 
+  // Time with NTP server
   timeClient.begin();
 
   Serial.println("dht.begin()...");
@@ -122,15 +118,9 @@ void setup(){
   // Turn on the backlight.
   lcd.backlight();
 
-  // Move the cursor characters to the right and
-  // zero characters down (line 1).
-  lcd.setCursor(5, 0);
-
-  // Print HELLO to the screen, starting at 5,0.
+  //print "HELLO WORLD"
+  lcd.setCursor(5, 0);  
   lcd.print("HELLO");
-
-  // Move the cursor to the next line and print
-  // WORLD.
   lcd.setCursor(5, 1);      
   lcd.print("WORLD");
 
@@ -143,24 +133,16 @@ void setup(){
 void printOnScreen()
 {  
   timeClient.update();
-
-  int hour = timeClient.getHours();
-  int min  = timeClient.getMinutes();
-  int sec  = timeClient.getSeconds();
-  int day  = timeClient.getDay();
-
-  Serial.print(hour);  Serial.print(":");  
-  Serial.print(min);  Serial.print(":");  
-  Serial.println(sec); 
-  Serial.print(daysOfTheWeek[day]);
+  
+  Serial.print(timeClient.getFormattedTime()); Serial.print(" ");
+  Serial.println(daysOfTheWeek[timeClient.getDay()]);
 
   lcd.clear();
+  lcd.setCursor(0, 0);  /*time formatted like `hh:mm:ss` + day*/
+  lcd.print(timeClient.getFormattedTime());
+  lcd.print("    ");  lcd.print(daysOfTheWeek[timeClient.getDay()]);
 
-  lcd.setCursor(0, 0);   /*HH:MM:SS    DDD */
-  lcd.print(hour); lcd.print(":"); lcd.print(min); lcd.print(":"); lcd.print(sec);
-  lcd.print("    ");  lcd.print(daysOfTheWeek[day]);
-
-  lcd.setCursor(0, 1);
+  lcd.setCursor(0, 1);  /*temperature and humidity*/
   lcd.print("T: "); lcd.print(temp, 1);   /* T: tt.t */
   lcd.setCursor(9, 1);      
   lcd.print("H: "); lcd.print(hum, 1);    /* H: hh.h */
@@ -170,60 +152,86 @@ void printOnScreen()
 void loop(){  
   unsigned long currentMillis = millis();
 
-  if (button1.pressed)
+  //Check button - turn backlight display on if button has been pressed
+  if (button.pressed)
   {
-    lcd.backlight();
     previousMillisLight = millis();
-    lightON = true;
-    button1.pressed = false;
+    button.pressed = false;
+    lcd.backlight();    
+    lightON = true;    
   }
 
-  if ( (lightON) && (currentMillis - previousMillisLight >= intervalLight) )
+  //Check display backlight - turn it off after intervalLight seconds 
+  if ( (currentMillis - previousMillisLight >= intervalLight) && (lightON) )
   {
     lightON = false;    
     lcd.noBacklight();
   }
 
-  if (currentMillis - previousMillis >= interval) {
+  //Check Wifi connection
+  if (currentMillis - previousMillisWifiCheck >= intervalWifiCheck)
+  {
+    previousMillisWifiCheck = millis();
+
+    if (isConnected == true)
+    {
+      if (!WiFi.isConnected())
+      {
+        digitalWrite(LED_WIFISTAT, HIGH);        
+        isConnected = false;
+        Serial.println("Conn LOST ");
+      }
+    }
+    else
+    {
+      Serial.println("Conn DOWN... ");
+      if (WiFi.isConnected()) {
+        digitalWrite(LED_WIFISTAT, LOW);
+        isConnected = true;
+        Serial.println("Conn OK ");
+      }
+    }
+  }
+
+  //Retrieve temperature and humidity after previousMillisTemp seconds
+  if (currentMillis - previousMillisTemp >= intervalTemp) {    
     // save the last time you updated the DHT values
-    previousMillis = currentMillis;
+    previousMillisTemp = currentMillis;
+    
     // Read temperature as Celsius (the default)
-    float newT = dht.readTemperature();
-    // Read temperature as Fahrenheit (isFahrenheit = true)
-    //float newT = dht.readTemperature(true);
-    // if temperature read failed, don't change t value
-    if (isnan(newT)) {
+    float newT = dht.readTemperature();    
+    if (isnan(newT)) 
+    {
+      // read failed, don't change t value
       Serial.println("Failed to read from DHT sensor! newT");
     }
     else {
       temp = newT;
       Serial.println(temp);
     }
+
     // Read Humidity
-    float newH = dht.readHumidity();
-    // if humidity read failed, don't change h value 
-    if (isnan(newH)) {
+    float newH = dht.readHumidity();    
+    if (isnan(newH)) 
+    {
+      // read failed, don't change h value 
       Serial.println("Failed to read from DHT sensor!");
     }
     else {
       hum = newH;
       Serial.println(hum);
     }
-    printOnScreen();
-    
+    printOnScreen();    
   }
+
 }
-
-
-
 
 
 void ICACHE_RAM_ATTR isr() {
     button_time = millis();
     if (button_time - last_button_time > 250)
     {
-      button1.numberKeyPresses++;
-      button1.pressed = true;
+      button.pressed = true;
       last_button_time = button_time;
     }
 }

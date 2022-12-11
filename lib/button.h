@@ -6,13 +6,12 @@
 
 struct Button {
   const uint8_t PIN;
-  uint32_t numberKeyPresses;
   bool pressed;
 };
 
 const int buttonPin = D6;
 
-Button button1 = {buttonPin, 0, false};
+Button button = {buttonPin, false};
 
 //variables to keep track of the timing of recent interrupts
 unsigned long button_time = 0;  
