@@ -12,3 +12,6 @@
  The user can reach the temperature and data values using the IP address shown at the startup.
  If the button is pressed the display switch the light on for 4 seconds (defined by const long intervalLight).
 
+#second commit
+ - Added release tag: 01.00.00
+ - Added time with NTP server

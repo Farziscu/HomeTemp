@@ -7,6 +7,12 @@
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
+#include "stdlib_noniso.h"
+
 #include <DHT.h>
 #include <LiquidCrystal_I2C.h>
 
@@ -14,6 +20,8 @@
 #include "lib/Temp.h"
 #include "lib/html.h"
 #include "lib/button.h"
+
+#define VER   "01.00.00"
 
 /*  DISPLAY */
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -33,6 +41,20 @@ unsigned long previousMillis      = 0;    // will store last time DHT was update
 // Updates DHT readings every 10 seconds
 const long interval      = 10000;  
 /*  TEMP - END */
+
+
+
+/* NTP */
+const long utcOffsetInSeconds = 3600;
+
+char daysOfTheWeek[7][12] = {"SUN", "MON", "TUE", "WED", "THUR", "FRI", "SAT"};
+
+// Define NTP Client to get time
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
+
+/* NTP - END */
+
 
 // Replaces placeholder with DHT values
 String processor(const String& var){
@@ -87,6 +109,8 @@ void setup(){
   // Start server
   server.begin();
 
+  timeClient.begin();
+
   Serial.println("dht.begin()...");
   dht.begin();
 
@@ -113,15 +137,33 @@ void setup(){
   delay(3000);
 
   lcd.noBacklight();  
+  lcd.clear();
 }
 
 void printOnScreen()
 {  
-  lcd.setCursor(1, 0);
-  lcd.print("TEMP: "); lcd.print(temp);
+  timeClient.update();
 
-  lcd.setCursor(1, 1);      
-  lcd.print("HUMIDITY: "); lcd.print(hum);
+  int hour = timeClient.getHours();
+  int min  = timeClient.getMinutes();
+  int sec  = timeClient.getSeconds();
+  int day  = timeClient.getDay();
+
+  Serial.print(hour);  Serial.print(":");  
+  Serial.print(min);  Serial.print(":");  
+  Serial.println(sec); 
+  Serial.print(daysOfTheWeek[day]);
+
+  lcd.clear();
+
+  lcd.setCursor(0, 0);   /*HH:MM:SS    DDD */
+  lcd.print(hour); lcd.print(":"); lcd.print(min); lcd.print(":"); lcd.print(sec);
+  lcd.print("    ");  lcd.print(daysOfTheWeek[day]);
+
+  lcd.setCursor(0, 1);
+  lcd.print("T: "); lcd.print(temp, 1);   /* T: tt.t */
+  lcd.setCursor(9, 1);      
+  lcd.print("H: "); lcd.print(hum, 1);    /* H: hh.h */
 }
  
 
