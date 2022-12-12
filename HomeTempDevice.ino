@@ -39,7 +39,8 @@ const long intervalTemp           = 10000;
 
 /* NTP */
 const long utcOffsetInSeconds = 3600;
-char daysOfTheWeek[7][12] = {"SUN", "MON", "TUE", "WED", "THUR", "FRI", "SAT"};
+char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
 
 // Define NTP Client to get time
 WiFiUDP   ntpUDP;
@@ -137,10 +138,14 @@ void printOnScreen()
   Serial.print(timeClient.getFormattedTime()); Serial.print(" ");
   Serial.println(daysOfTheWeek[timeClient.getDay()]);
 
-  lcd.clear();
-  lcd.setCursor(0, 0);  /*time formatted like `hh:mm:ss` + day*/
-  lcd.print(timeClient.getFormattedTime());
-  lcd.print("    ");  lcd.print(daysOfTheWeek[timeClient.getDay()]);
+  /* set hour, minutes and day in this format 'HH:MM  ddddddddd' */
+  lcd.clear();   
+  lcd.setCursor(0, 0);  
+  lcd.print(timeClient.getFormattedTime()); /* time formatted like `hh:mm:ss` */
+  lcd.setCursor(5, 0);   
+  lcd.print("   ");                         /* removes ss from `hh:mm:ss` string */
+  lcd.setCursor(7, 0);   
+  lcd.print(daysOfTheWeek[timeClient.getDay()]); /* Add day */
 
   lcd.setCursor(0, 1);  /*temperature and humidity*/
   lcd.print("T: "); lcd.print(temp, 1);   /* T: tt.t */
