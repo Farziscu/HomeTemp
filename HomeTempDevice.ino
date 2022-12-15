@@ -19,28 +19,33 @@
 #define LED_WIFISTAT  D8   //LED at GPIO4 D8
 
 /*  DISPLAY */
-LiquidCrystal_I2C lcd(0x27, 16, 2);
-bool          lightON             = false;
-unsigned long previousMillisLight = 0;
 const long    intervalLight       = 4000;  //4 seconds
+unsigned long previousMillisLight = 0;
+bool          lightON             = false;
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 /*  DISPLAY - END */
 
 
 
 /*  TEMP */
+// Updates DHT readings every 10 seconds
+const long intervalTemp           = 10000;  
+unsigned long previousMillisTemp  = 0;    // store last time DHT was updated
+
 // current temperature & humidity, updated in loop()
 float         temp  = 0.0;
 float         hum   = 0.0;
-unsigned long previousMillisTemp  = 0;    // will store last time DHT was updated
-// Updates DHT readings every 10 seconds
-const long intervalTemp           = 10000;  
 /*  TEMP - END */
 
 
 /* NTP */
 const long utcOffsetInSeconds = 3600;
-char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+const long intervalUpdateTime = 20 * 60000; //20 min
 
+unsigned long previousMillisUpdateTime = 0;
+unsigned long previousMillisTime = 0;
+
+char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 // Define NTP Client to get time
 WiFiUDP   ntpUDP;
@@ -69,7 +74,6 @@ void setup(){
   digitalWrite(LED_WIFISTAT, HIGH);
 
   //Button
-  //pinMode(buttonPin, INPUT);
   pinMode(button.PIN, INPUT_PULLUP);
   attachInterrupt(button.PIN, isr, FALLING);
 
@@ -107,6 +111,7 @@ void setup(){
 
   // Time with NTP server
   timeClient.begin();
+  timeClient.update();
 
   Serial.println("dht.begin()...");
   dht.begin();
@@ -133,8 +138,6 @@ void setup(){
 
 void printOnScreen()
 {  
-  timeClient.update();
-  
   Serial.print(timeClient.getFormattedTime()); Serial.print(" ");
   Serial.println(daysOfTheWeek[timeClient.getDay()]);
 
@@ -229,6 +232,12 @@ void loop(){
     printOnScreen();    
   }
 
+  //Align local epochtime with NTP server
+  if (currentMillis - previousMillisUpdateTime >= intervalUpdateTime)
+  {
+    previousMillisUpdateTime = millis();
+    timeClient.update();       
+  }
 }
 
 
